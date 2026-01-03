@@ -130,6 +130,6 @@ type Mode = 'preset' | 'custom' | 'single' | 'newMode'
 ## Dependencies
 
 - Keep dependencies minimal and up-to-date
-- Use exact versions (^) for production dependencies
+- Use caret ranges (^) for semver-compatible versions
 - All dependencies are in devDependencies except React and React-DOM
 - Avoid adding unnecessary libraries - prefer vanilla solutions when simple

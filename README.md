@@ -5,7 +5,7 @@ A static web application that generates colored chat text for Where Winds Meet w
 ## Features
 
 - **Multiple Color Modes**:
-  - **Preset Gradients**: Choose from 5 built-in gradients (Rainbow, Fire, Ocean, Sunset, Forest)
+  - **Preset Gradients**: Choose from 6 built-in gradients (Rainbow, Fire, Ocean, Sunset, Forest, Pink)
   - **Custom Gradients**: Create your own gradient with multiple color stops
   - **Single Color**: Apply a single color to all text
 

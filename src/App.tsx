@@ -31,6 +31,12 @@ const PRESETS = {
     { position: 0.5, color: '#228b22' },
     { position: 1, color: '#006400' },
   ],
+  pink: [
+    { position: 0, color: '#ffb3d9' },
+    { position: 0.33, color: '#ff80bf' },
+    { position: 0.67, color: '#ff4da6' },
+    { position: 1, color: '#e91e8c' },
+  ],
 }
 
 type ColorStop = { position: number; color: string }

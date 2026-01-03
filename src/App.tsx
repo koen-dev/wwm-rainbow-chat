@@ -104,6 +104,32 @@ function generateRainbowText(text: string, stops: ColorStop[], ignoreSpaces: boo
   return result
 }
 
+function generateRainbowTextByWord(text: string, stops: ColorStop[]): string {
+  // Split by spaces while preserving them
+  const words = text.split(/(\s+)/)
+  const nonSpaceWords = words.filter((w) => w.trim().length > 0)
+  
+  if (nonSpaceWords.length === 0) return text
+
+  let result = ''
+  let wordIndex = 0
+
+  for (const word of words) {
+    if (word.trim().length === 0) {
+      // It's whitespace, keep it as is
+      result += word
+    } else {
+      // It's a word, apply color
+      const position = wordIndex / Math.max(1, nonSpaceWords.length - 1)
+      const color = getColorAtPosition(stops, position)
+      result += color + word
+      wordIndex++
+    }
+  }
+
+  return result
+}
+
 function splitIntoMessages(rainbowText: string, maxLength: number): string[] {
   if (rainbowText.length <= maxLength) {
     return [rainbowText]
@@ -163,6 +189,7 @@ function App() {
   const [singleColor, setSingleColor] = useState('#ff0000')
   const [inputText, setInputText] = useState('')
   const [ignoreSpaces, setIgnoreSpaces] = useState(true)
+  const [colorPerWord, setColorPerWord] = useState(false)
   const [enableSplitting, setEnableSplitting] = useState(false)
   const [copySuccess, setCopySuccess] = useState<number | boolean>(false)
 
@@ -178,6 +205,7 @@ function App() {
         if (data.singleColor) setSingleColor(data.singleColor)
         if (data.inputText) setInputText(data.inputText)
         if (data.ignoreSpaces !== undefined) setIgnoreSpaces(data.ignoreSpaces)
+        if (data.colorPerWord !== undefined) setColorPerWord(data.colorPerWord)
         if (data.enableSplitting !== undefined) setEnableSplitting(data.enableSplitting)
       } catch (e) {
         console.error('Failed to load saved data', e)
@@ -196,10 +224,11 @@ function App() {
         singleColor,
         inputText,
         ignoreSpaces,
+        colorPerWord,
         enableSplitting,
       })
     )
-  }, [mode, selectedPreset, customStops, singleColor, inputText, ignoreSpaces, enableSplitting])
+  }, [mode, selectedPreset, customStops, singleColor, inputText, ignoreSpaces, colorPerWord, enableSplitting])
 
   const currentStops = useMemo(() => {
     if (mode === 'preset') {
@@ -212,8 +241,12 @@ function App() {
   }, [mode, selectedPreset, customStops, singleColor])
 
   const output = useMemo(() => {
-    return generateRainbowText(inputText, currentStops, ignoreSpaces)
-  }, [inputText, currentStops, ignoreSpaces])
+    if (colorPerWord) {
+      return generateRainbowTextByWord(inputText, currentStops)
+    } else {
+      return generateRainbowText(inputText, currentStops, ignoreSpaces)
+    }
+  }, [inputText, currentStops, ignoreSpaces, colorPerWord])
 
   const messages = useMemo(() => {
     if (enableSplitting) {
@@ -228,7 +261,9 @@ function App() {
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newText = e.target.value
-    const testOutput = generateRainbowText(newText, currentStops, ignoreSpaces)
+    const testOutput = colorPerWord 
+      ? generateRainbowTextByWord(newText, currentStops)
+      : generateRainbowText(newText, currentStops, ignoreSpaces)
     
     // Allow changes if splitting is enabled, or if within limit, or if length is decreasing
     if (enableSplitting || testOutput.length <= MAX_OUTPUT_LENGTH || testOutput.length < output.length) {
@@ -278,23 +313,55 @@ function App() {
 
   const previewChars = useMemo(() => {
     if (!inputText) return []
-    const chars = inputText.split('')
-    const relevantChars = ignoreSpaces ? chars.filter((c) => c !== ' ') : chars
     
-    if (relevantChars.length === 0) return []
+    if (colorPerWord) {
+      // Per-word coloring
+      const words = inputText.split(/(\s+)/)
+      const nonSpaceWords = words.filter((w) => w.trim().length > 0)
+      
+      if (nonSpaceWords.length === 0) return []
 
-    let colorIndex = 0
-    return chars.map((char, idx) => {
-      if (ignoreSpaces && char === ' ') {
-        return { char, color: 'transparent', key: `${idx}-${char}` }
-      } else {
-        const position = colorIndex / Math.max(1, relevantChars.length - 1)
-        const color = getColorAtPosition(currentStops, position)
-        colorIndex++
-        return { char, color, key: `${idx}-${char}-${color}` }
+      let wordIndex = 0
+      const result: { char: string; color: string; key: string }[] = []
+
+      for (const word of words) {
+        if (word.trim().length === 0) {
+          // It's whitespace
+          for (let i = 0; i < word.length; i++) {
+            result.push({ char: word[i], color: 'transparent', key: `${result.length}-${word[i]}-transparent` })
+          }
+        } else {
+          // It's a word
+          const position = wordIndex / Math.max(1, nonSpaceWords.length - 1)
+          const color = getColorAtPosition(currentStops, position)
+          for (let i = 0; i < word.length; i++) {
+            result.push({ char: word[i], color, key: `${result.length}-${word[i]}-${color}` })
+          }
+          wordIndex++
+        }
       }
-    })
-  }, [inputText, currentStops, ignoreSpaces])
+
+      return result
+    } else {
+      // Per-character coloring
+      const chars = inputText.split('')
+      const relevantChars = ignoreSpaces ? chars.filter((c) => c !== ' ') : chars
+      
+      if (relevantChars.length === 0) return []
+
+      let colorIndex = 0
+      return chars.map((char, idx) => {
+        if (ignoreSpaces && char === ' ') {
+          return { char, color: 'transparent', key: `${idx}-${char}` }
+        } else {
+          const position = colorIndex / Math.max(1, relevantChars.length - 1)
+          const color = getColorAtPosition(currentStops, position)
+          colorIndex++
+          return { char, color, key: `${idx}-${char}-${color}` }
+        }
+      })
+    }
+  }, [inputText, currentStops, ignoreSpaces, colorPerWord])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4">
@@ -460,19 +527,33 @@ function App() {
             className="w-full px-4 py-3 bg-gray-700 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px] resize-vertical"
           />
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  id="ignoreSpaces"
-                  checked={ignoreSpaces}
-                  onChange={(e) => setIgnoreSpaces(e.target.checked)}
+                  id="colorPerWord"
+                  checked={colorPerWord}
+                  onChange={(e) => setColorPerWord(e.target.checked)}
                   className="w-4 h-4 rounded cursor-pointer"
                 />
-                <label htmlFor="ignoreSpaces" className="cursor-pointer select-none">
-                  Ignore spaces when applying colors
+                <label htmlFor="colorPerWord" className="cursor-pointer select-none">
+                  Color per word (saves characters!)
                 </label>
               </div>
+              {!colorPerWord && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="ignoreSpaces"
+                    checked={ignoreSpaces}
+                    onChange={(e) => setIgnoreSpaces(e.target.checked)}
+                    className="w-4 h-4 rounded cursor-pointer"
+                  />
+                  <label htmlFor="ignoreSpaces" className="cursor-pointer select-none">
+                    Ignore spaces when applying colors
+                  </label>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"

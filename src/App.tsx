@@ -123,10 +123,10 @@ function splitIntoMessages(rainbowText: string, maxLength: number): string[] {
         chunkEnd--
       }
       
-      // Verify it's actually a color code (should be followed by 6 hex chars + 1 character)
+      // Verify it's actually a color code (should be followed by 6 hex chars)
       // If not, continue backtracking
       while (chunkEnd > currentPos) {
-        if (rainbowText[chunkEnd] === '#' && chunkEnd + 7 < rainbowText.length) {
+        if (rainbowText[chunkEnd] === '#' && chunkEnd + 7 <= rainbowText.length) {
           const hexPart = rainbowText.slice(chunkEnd + 1, chunkEnd + 7)
           if (/^[0-9a-f]{6}$/i.test(hexPart)) {
             break

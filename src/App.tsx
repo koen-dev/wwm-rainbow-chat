@@ -261,7 +261,7 @@ function App() {
         if (word.trim().length === 0) {
           // It's whitespace
           for (let i = 0; i < word.length; i++) {
-            result.push({ char: word[i], color: 'transparent', key: `${result.length}-${word[i]}` })
+            result.push({ char: word[i], color: 'transparent', key: `${result.length}-${word[i]}-transparent` })
           }
         } else {
           // It's a word

@@ -104,6 +104,8 @@ function generateRainbowText(text: string, stops: ColorStop[], ignoreSpaces: boo
   return result
 }
 
+const MAX_OUTPUT_LENGTH = 300
+
 function App() {
   const [mode, setMode] = useState<'preset' | 'custom' | 'single'>('preset')
   const [selectedPreset, setSelectedPreset] = useState<keyof typeof PRESETS>('rainbow')
@@ -162,6 +164,20 @@ function App() {
   const output = useMemo(() => {
     return generateRainbowText(inputText, currentStops, ignoreSpaces)
   }, [inputText, currentStops, ignoreSpaces])
+
+  const outputLength = output.length
+  const isOverLimit = outputLength > MAX_OUTPUT_LENGTH
+  const isNearLimit = outputLength > MAX_OUTPUT_LENGTH * 0.9
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newText = e.target.value
+    const testOutput = generateRainbowText(newText, currentStops, ignoreSpaces)
+    
+    // Only update if within limit
+    if (testOutput.length <= MAX_OUTPUT_LENGTH) {
+      setInputText(newText)
+    }
+  }
 
   const handleCopy = async () => {
     try {
@@ -372,21 +388,29 @@ function App() {
           <h3 className="text-xl font-semibold">Input Text</h3>
           <textarea
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            onChange={handleTextChange}
             placeholder="Enter your text here..."
             className="w-full px-4 py-3 bg-gray-700 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px] resize-vertical"
           />
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="ignoreSpaces"
-              checked={ignoreSpaces}
-              onChange={(e) => setIgnoreSpaces(e.target.checked)}
-              className="w-4 h-4 rounded cursor-pointer"
-            />
-            <label htmlFor="ignoreSpaces" className="cursor-pointer select-none">
-              Ignore spaces when applying colors
-            </label>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="ignoreSpaces"
+                checked={ignoreSpaces}
+                onChange={(e) => setIgnoreSpaces(e.target.checked)}
+                className="w-4 h-4 rounded cursor-pointer"
+              />
+              <label htmlFor="ignoreSpaces" className="cursor-pointer select-none">
+                Ignore spaces when applying colors
+              </label>
+            </div>
+            <div className={`text-sm font-medium ${
+              isOverLimit ? 'text-red-500' : isNearLimit ? 'text-yellow-500' : 'text-gray-400'
+            }`}>
+              {outputLength} / {MAX_OUTPUT_LENGTH} characters
+              {isOverLimit && <span className="ml-2 text-red-500">(Limit exceeded!)</span>}
+            </div>
           </div>
         </div>
 

@@ -104,6 +104,38 @@ function generateRainbowText(text: string, stops: ColorStop[], ignoreSpaces: boo
   return result
 }
 
+function splitIntoMessages(rainbowText: string, maxLength: number): string[] {
+  if (rainbowText.length <= maxLength) {
+    return [rainbowText]
+  }
+
+  const messages: string[] = []
+  let currentPos = 0
+
+  while (currentPos < rainbowText.length) {
+    let chunkEnd = currentPos + maxLength
+    
+    // If we're not at the end and the next character is not a #, 
+    // we're in the middle of a colored character, so backtrack
+    if (chunkEnd < rainbowText.length && rainbowText[chunkEnd] !== '#') {
+      // Find the last # before chunkEnd
+      while (chunkEnd > currentPos && rainbowText[chunkEnd] !== '#') {
+        chunkEnd--
+      }
+    }
+    
+    // If we couldn't find a safe split point, force split at maxLength
+    if (chunkEnd === currentPos) {
+      chunkEnd = currentPos + maxLength
+    }
+    
+    messages.push(rainbowText.slice(currentPos, chunkEnd))
+    currentPos = chunkEnd
+  }
+
+  return messages
+}
+
 const MAX_OUTPUT_LENGTH = 300
 
 function App() {
@@ -116,6 +148,7 @@ function App() {
   const [singleColor, setSingleColor] = useState('#ff0000')
   const [inputText, setInputText] = useState('')
   const [ignoreSpaces, setIgnoreSpaces] = useState(true)
+  const [enableSplitting, setEnableSplitting] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
 
   // Load from localStorage on mount
@@ -130,6 +163,7 @@ function App() {
         if (data.singleColor) setSingleColor(data.singleColor)
         if (data.inputText) setInputText(data.inputText)
         if (data.ignoreSpaces !== undefined) setIgnoreSpaces(data.ignoreSpaces)
+        if (data.enableSplitting !== undefined) setEnableSplitting(data.enableSplitting)
       } catch (e) {
         console.error('Failed to load saved data', e)
       }
@@ -147,9 +181,10 @@ function App() {
         singleColor,
         inputText,
         ignoreSpaces,
+        enableSplitting,
       })
     )
-  }, [mode, selectedPreset, customStops, singleColor, inputText, ignoreSpaces])
+  }, [mode, selectedPreset, customStops, singleColor, inputText, ignoreSpaces, enableSplitting])
 
   const currentStops = useMemo(() => {
     if (mode === 'preset') {
@@ -165,16 +200,23 @@ function App() {
     return generateRainbowText(inputText, currentStops, ignoreSpaces)
   }, [inputText, currentStops, ignoreSpaces])
 
+  const messages = useMemo(() => {
+    if (enableSplitting) {
+      return splitIntoMessages(output, MAX_OUTPUT_LENGTH)
+    }
+    return [output]
+  }, [output, enableSplitting])
+
   const outputLength = output.length
-  const isOverLimit = outputLength > MAX_OUTPUT_LENGTH
-  const isNearLimit = outputLength > MAX_OUTPUT_LENGTH * 0.9
+  const isOverLimit = outputLength > MAX_OUTPUT_LENGTH && !enableSplitting
+  const isNearLimit = outputLength > MAX_OUTPUT_LENGTH * 0.9 && !enableSplitting
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newText = e.target.value
     const testOutput = generateRainbowText(newText, currentStops, ignoreSpaces)
     
-    // Allow changes that reduce or maintain length, or stay within limit
-    if (testOutput.length <= MAX_OUTPUT_LENGTH || testOutput.length < output.length) {
+    // Allow changes if splitting is enabled, or if within limit, or if length is decreasing
+    if (enableSplitting || testOutput.length <= MAX_OUTPUT_LENGTH || testOutput.length < output.length) {
       setInputText(newText)
     }
   }
@@ -182,6 +224,16 @@ function App() {
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(output)
+      setCopySuccess(true)
+      setTimeout(() => setCopySuccess(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+
+  const handleCopyMessage = async (message: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(message)
       setCopySuccess(true)
       setTimeout(() => setCopySuccess(false), 2000)
     } catch (err) {
@@ -393,22 +445,39 @@ function App() {
             className="w-full px-4 py-3 bg-gray-700 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px] resize-vertical"
           />
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="ignoreSpaces"
-                checked={ignoreSpaces}
-                onChange={(e) => setIgnoreSpaces(e.target.checked)}
-                className="w-4 h-4 rounded cursor-pointer"
-              />
-              <label htmlFor="ignoreSpaces" className="cursor-pointer select-none">
-                Ignore spaces when applying colors
-              </label>
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="ignoreSpaces"
+                  checked={ignoreSpaces}
+                  onChange={(e) => setIgnoreSpaces(e.target.checked)}
+                  className="w-4 h-4 rounded cursor-pointer"
+                />
+                <label htmlFor="ignoreSpaces" className="cursor-pointer select-none">
+                  Ignore spaces when applying colors
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="enableSplitting"
+                  checked={enableSplitting}
+                  onChange={(e) => setEnableSplitting(e.target.checked)}
+                  className="w-4 h-4 rounded cursor-pointer"
+                />
+                <label htmlFor="enableSplitting" className="cursor-pointer select-none">
+                  Split into multiple messages (300 char limit each)
+                </label>
+              </div>
             </div>
             <div className={`text-sm font-medium ${
               isOverLimit ? 'text-red-500' : isNearLimit ? 'text-yellow-500' : 'text-gray-400'
             }`}>
-              {outputLength} / {MAX_OUTPUT_LENGTH} characters
+              {outputLength} characters
+              {enableSplitting && outputLength > MAX_OUTPUT_LENGTH && (
+                <span className="ml-2 text-blue-400">({messages.length} messages)</span>
+              )}
               {isOverLimit && <span className="ml-2 text-red-500">(Limit exceeded!)</span>}
             </div>
           </div>
@@ -429,21 +498,52 @@ function App() {
 
             <div className="bg-gray-800 rounded-lg p-6 space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-xl font-semibold">Output</h3>
-                <button
-                  onClick={handleCopy}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    copySuccess
-                      ? 'bg-green-600 hover:bg-green-700'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-                >
-                  {copySuccess ? '✓ Copied!' : 'Copy to Clipboard'}
-                </button>
+                <h3 className="text-xl font-semibold">
+                  Output {enableSplitting && messages.length > 1 && `(${messages.length} messages)`}
+                </h3>
+                {!enableSplitting || messages.length === 1 ? (
+                  <button
+                    onClick={handleCopy}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      copySuccess
+                        ? 'bg-green-600 hover:bg-green-700'
+                        : 'bg-blue-600 hover:bg-blue-700'
+                    }`}
+                  >
+                    {copySuccess ? '✓ Copied!' : 'Copy to Clipboard'}
+                  </button>
+                ) : null}
               </div>
-              <div className="bg-gray-900 rounded-lg p-4 min-h-[60px] break-all font-mono text-sm">
-                {output || <span className="text-gray-500">Output will appear here...</span>}
-              </div>
+              {enableSplitting && messages.length > 1 ? (
+                <div className="space-y-4">
+                  {messages.map((message, index) => (
+                    <div key={index} className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-sm font-medium text-gray-400">
+                          Message {index + 1} ({message.length} characters)
+                        </h4>
+                        <button
+                          onClick={() => handleCopyMessage(message, index)}
+                          className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                            copySuccess
+                              ? 'bg-green-600 hover:bg-green-700'
+                              : 'bg-blue-600 hover:bg-blue-700'
+                          }`}
+                        >
+                          {copySuccess ? '✓ Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                      <div className="bg-gray-900 rounded-lg p-4 min-h-[60px] break-all font-mono text-sm">
+                        {message}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-gray-900 rounded-lg p-4 min-h-[60px] break-all font-mono text-sm">
+                  {output || <span className="text-gray-500">Output will appear here...</span>}
+                </div>
+              )}
             </div>
           </>
         )}

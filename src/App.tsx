@@ -118,9 +118,24 @@ function splitIntoMessages(rainbowText: string, maxLength: number): string[] {
     // If we're not at the end and the next character is not a #, 
     // we're in the middle of a colored character, so backtrack
     if (chunkEnd < rainbowText.length && rainbowText[chunkEnd] !== '#') {
-      // Find the last # before chunkEnd
+      // Find the last # before chunkEnd that starts a valid color code
       while (chunkEnd > currentPos && rainbowText[chunkEnd] !== '#') {
         chunkEnd--
+      }
+      
+      // Verify it's actually a color code (should be followed by 6 hex chars + 1 character)
+      // If not, continue backtracking
+      while (chunkEnd > currentPos) {
+        if (rainbowText[chunkEnd] === '#' && chunkEnd + 7 < rainbowText.length) {
+          const hexPart = rainbowText.slice(chunkEnd + 1, chunkEnd + 7)
+          if (/^[0-9a-f]{6}$/i.test(hexPart)) {
+            break
+          }
+        }
+        chunkEnd--
+        while (chunkEnd > currentPos && rainbowText[chunkEnd] !== '#') {
+          chunkEnd--
+        }
       }
     }
     
@@ -149,7 +164,7 @@ function App() {
   const [inputText, setInputText] = useState('')
   const [ignoreSpaces, setIgnoreSpaces] = useState(true)
   const [enableSplitting, setEnableSplitting] = useState(false)
-  const [copySuccess, setCopySuccess] = useState(false)
+  const [copySuccess, setCopySuccess] = useState<number | boolean>(false)
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -234,7 +249,7 @@ function App() {
   const handleCopyMessage = async (message: string, index: number) => {
     try {
       await navigator.clipboard.writeText(message)
-      setCopySuccess(true)
+      setCopySuccess(index)
       setTimeout(() => setCopySuccess(false), 2000)
     } catch (err) {
       console.error('Failed to copy:', err)
@@ -505,12 +520,12 @@ function App() {
                   <button
                     onClick={handleCopy}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                      copySuccess
+                      copySuccess === true
                         ? 'bg-green-600 hover:bg-green-700'
                         : 'bg-blue-600 hover:bg-blue-700'
                     }`}
                   >
-                    {copySuccess ? '✓ Copied!' : 'Copy to Clipboard'}
+                    {copySuccess === true ? '✓ Copied!' : 'Copy to Clipboard'}
                   </button>
                 ) : null}
               </div>
@@ -525,12 +540,12 @@ function App() {
                         <button
                           onClick={() => handleCopyMessage(message, index)}
                           className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                            copySuccess
+                            copySuccess === index
                               ? 'bg-green-600 hover:bg-green-700'
                               : 'bg-blue-600 hover:bg-blue-700'
                           }`}
                         >
-                          {copySuccess ? '✓ Copied!' : 'Copy'}
+                          {copySuccess === index ? '✓ Copied!' : 'Copy'}
                         </button>
                       </div>
                       <div className="bg-gray-900 rounded-lg p-4 min-h-[60px] break-all font-mono text-sm">

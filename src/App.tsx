@@ -173,8 +173,8 @@ function App() {
     const newText = e.target.value
     const testOutput = generateRainbowText(newText, currentStops, ignoreSpaces)
     
-    // Only update if within limit
-    if (testOutput.length <= MAX_OUTPUT_LENGTH) {
+    // Allow changes that reduce or maintain length, or stay within limit
+    if (testOutput.length <= MAX_OUTPUT_LENGTH || newText.length < inputText.length) {
       setInputText(newText)
     }
   }
